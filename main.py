@@ -24,7 +24,8 @@ def main():
   train_split, test_split = datasets.IMDB.splits(TEXT, LABEL)
 
   # build the vocabulary
-  TEXT.build_vocab(train_split, vectors=GloVe(name='6B', dim=ARGS.d_model))
+  # TEXT.build_vocab(train_split, vectors=GloVe(name='6B', dim=ARGS.d_model))
+  TEXT.build_vocab(train_split)
   LABEL.build_vocab(train_split)
 
   # make iterator for splits
@@ -47,7 +48,7 @@ def main():
 
 
 def accuracy(output, labels):
-  predicted = output.argmax(0)
+  predicted = output.argmax(-1)
   return (predicted == (labels-1).long()).float().mean().item()
 
 
@@ -64,21 +65,21 @@ def train(epoch, ntokens, model, train_iter, criterion, optimizer):
     output = model(data[0])
     loss = criterion(output, (targets-1))
     loss.backward()
-    # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
     optimizer.step()
     
     total_loss += loss.item()
-    log_interval = 10
+    log_interval = 3
     if i % log_interval == 0 and i > 0:
       cur_loss = total_loss / log_interval
       elapsed = time.time() - start_time
       train_accuracy = accuracy(output, targets)
       print('| epoch {:3d} | {:5d}/{:5d} batches | '
             'ms/batch {:5.2f} | '
-            'loss {:5.2f} | ppl {:8.2f} | train acc {:5.2f}'.format(
+            'loss {:5.2f} | train acc {:5.2f}'.format(
               epoch, i, len(train_iter),
               elapsed * 1000 / log_interval,
-              cur_loss, math.exp(cur_loss), train_accuracy))
+              cur_loss, train_accuracy))
       total_loss = 0.
       start_time = time.time()
 
@@ -93,15 +94,15 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--epochs', default=4, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=8, type=int,
+  parser.add_argument('--batch_size', default=32, type=int,
                       help='batch size')
-  parser.add_argument('--d_model', default=300, type=int,
+  parser.add_argument('--d_model', default=128, type=int,
                       help='embedding size')
-  parser.add_argument('--nhead', default=2, type=int,
+  parser.add_argument('--nhead', default=4, type=int,
                       help='heads in multi head attention')
-  parser.add_argument('--num_layers', default=6, type=int,
+  parser.add_argument('--num_layers', default=2, type=int,
                       help='amount of layers transformer')
-  parser.add_argument('--d_mpool', default=128, type=int,
+  parser.add_argument('--d_mpool', default=64, type=int,
                       help='number of vectors in sequence pooling')
 
   ARGS = parser.parse_args()

@@ -11,7 +11,7 @@ class PositionalEncoding(nn.Module):
   Positional encoding.
   """
 
-  def __init__(self, d_model, dropout=0.1, max_len=5000):
+  def __init__(self, d_model, dropout=0.0, max_len=5000):
     super(PositionalEncoding, self).__init__()
     self.dropout = nn.Dropout(p=dropout)
 
@@ -45,18 +45,19 @@ class Model(nn.Module):
     self.ste = StochasticNeuron()
     encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead)
     self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-    self.maxpool = nn.AdaptiveMaxPool2d((d_mpool, d_model))
-    self.fc1 = nn.Linear(d_mpool*d_model, 256)
+    # self.maxpool = nn.AdaptiveMaxPool2d((d_mpool, d_mpool))
+    self.maxpool = nn.AdaptiveAvgPool2d((d_mpool, d_mpool))
+    self.fc1 = nn.Linear(d_mpool*d_mpool, 256)
     self.fc2 = nn.Linear(256, n_output)
 
   def forward(self, input):
     """"""
     embedded = self.embedding(input)
     pos_encoded = self.pos_encoder(embedded)
-    out = self.ste(pos_encoded)
-    out = self.transformer_encoder(out)
+    # out = self.ste(pos_encoded)
+    out = self.transformer_encoder(pos_encoded)
     out = self.maxpool(out)
-    out = out.view(-1, self.d_mpool*self.d_model)
+    out = out.view(-1, self.d_mpool*self.d_mpool)
     out = self.fc1(out)
     out = self.fc2(out)
     return F.logsigmoid(out)
