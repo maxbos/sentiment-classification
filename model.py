@@ -35,6 +35,7 @@ class Model(nn.Module):
     self, ntokens, d_model, nhead, num_layers, device,
     n_output=2
   ):
+    super(Model, self).__init__()
     self.embedding = nn.Embedding(ntokens, d_model)
     self.pos_encoder = PositionalEncoding(d_model)
     self.ste = StochasticNeuron()
@@ -50,4 +51,4 @@ class Model(nn.Module):
     out = self.transformer_encoder(out)
     print('out transformer', out.size())
     out = self.fc(out)
-    return F.sigmoid(out)
+    return F.logsigmoid(out)
