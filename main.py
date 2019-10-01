@@ -25,7 +25,15 @@ def main():
   
   for epoch in range(1, ARGS.epochs + 1):
     train(train_iter)
+    evaluate(test_iter)
 
+def evaluate(model, test_iter):
+  loss = 0.
+  model.eval()
+  for i, batch in test_iter:
+    loss += model(batch)
+
+  return loss / (i + 1)
 
 def train(train_iter):
   model.train()
@@ -41,6 +49,12 @@ if __name__ == "__main__":
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=4, type=int,
                       help='batch size')
+  parser.add_argument('--d_model', default=300, type=int,
+                      help='embedding size')
+  parser.add_argument('--nhead', default=2, type=int,
+                      help='heads in multi head attention')
+  parser.add_argument('--num_layers', default=6, type=int,
+                      help='amount of layers transformer')
 
   ARGS = parser.parse_args()
   DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
