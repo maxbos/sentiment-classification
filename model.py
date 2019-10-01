@@ -33,8 +33,9 @@ class Model(nn.Module):
 
   def __init__(
     self, ntokens, d_model, nhead, num_layers, device,
-    n_output=2
+    n_output=2,
   ):
+    super(Model, self).__init__()
     self.embedding = nn.Embedding(ntokens, d_model)
     self.pos_encoder = PositionalEncoding(d_model)
     self.ste = StochasticNeuron()
