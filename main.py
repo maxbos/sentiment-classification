@@ -93,7 +93,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--epochs', default=4, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=2, type=int,
+  parser.add_argument('--batch_size', default=8, type=int,
                       help='batch size')
   parser.add_argument('--d_model', default=300, type=int,
                       help='embedding size')
