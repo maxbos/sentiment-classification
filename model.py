@@ -51,4 +51,4 @@ class Model(nn.Module):
     out = self.transformer_encoder(out)
     print('out transformer', out.size())
     out = self.fc(out)
-    return F.sigmoid(out)
+    return F.logsigmoid(out)

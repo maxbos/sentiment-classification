@@ -5,6 +5,8 @@ import os
 import math
 import numpy as np
 import torchtext
+import torchtext.data as data
+# import torchtext.vocab.GloVe as GloVe
 import torchtext.datasets as datasets
 from torchtext.vocab import GloVe
 
@@ -72,7 +74,7 @@ def train(epoch, ntokens, model, train_iter, criterion, optimizer):
       start_time = time.time()
 
 
-def evaluate(model, test_iter):
+def evaluate(model, loss, test_iter):
   loss = 0.
   model.eval()
   for i, batch in test_iter:
@@ -86,7 +88,7 @@ if __name__ == "__main__":
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=4, type=int,
                       help='batch size')
-  parser.add_argument('--d_model', default=300, type=int,
+  parser.add_argument('--d_model', default=50, type=int,
                       help='embedding size')
   parser.add_argument('--nhead', default=2, type=int,
                       help='heads in multi head attention')
