@@ -35,6 +35,7 @@ def main():
   model = Model(
     ntokens=ntokens,
     d_model=ARGS.d_model, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
+    d_mpool=ARGS.d_mpool,
     device=DEVICE,
   )
 
@@ -45,55 +46,63 @@ def main():
     train(epoch, ntokens, model, train_iter, criterion, optimizer)
 
 
+def accuracy(output, labels):
+  predicted = output.argmax(0)
+  return (predicted == (labels-1).long()).float().mean().item()
+
+
 def train(epoch, ntokens, model, train_iter, criterion, optimizer):
   """"""
   model.train()
   start_time = time.time()
-  loss = 0.
+  total_loss = 0.
   for i, batch in enumerate(train_iter):
-    data, targets = batch
+    data = batch.text
+    targets = batch.label
     optimizer.zero_grad()
-    output = model(data)
-    loss = criterion(output.view(-1, ntokens), targets)
+    # data[0] returns the sequence matrix
+    output = model(data[0])
+    loss = criterion(output, (targets-1))
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+    # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
     optimizer.step()
     
     total_loss += loss.item()
-    log_interval = 200
+    log_interval = 10
     if i % log_interval == 0 and i > 0:
       cur_loss = total_loss / log_interval
       elapsed = time.time() - start_time
+      train_accuracy = accuracy(output, targets)
       print('| epoch {:3d} | {:5d}/{:5d} batches | '
             'ms/batch {:5.2f} | '
-            'loss {:5.2f} | ppl {:8.2f}'.format(
+            'loss {:5.2f} | ppl {:8.2f} | train acc {:5.2f}'.format(
               epoch, i, len(train_iter),
               elapsed * 1000 / log_interval,
-              cur_loss, math.exp(cur_loss)))
-      total_loss = 0
+              cur_loss, math.exp(cur_loss), train_accuracy))
+      total_loss = 0.
       start_time = time.time()
 
 
-def evaluate(model, loss, test_iter):
-  loss = 0.
-  model.eval()
-  for i, batch in test_iter:
-    loss += model(batch)
-  return loss / (i + 1)
+# def evaluate(model, loss, test_iter):
+#   model.eval()
+#   with torch.no_grad():
+    
 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
-  parser.add_argument('--epochs', default=30, type=int,
+  parser.add_argument('--epochs', default=4, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=4, type=int,
+  parser.add_argument('--batch_size', default=2, type=int,
                       help='batch size')
-  parser.add_argument('--d_model', default=50, type=int,
+  parser.add_argument('--d_model', default=300, type=int,
                       help='embedding size')
   parser.add_argument('--nhead', default=2, type=int,
                       help='heads in multi head attention')
   parser.add_argument('--num_layers', default=6, type=int,
                       help='amount of layers transformer')
+  parser.add_argument('--d_mpool', default=128, type=int,
+                      help='number of vectors in sequence pooling')
 
   ARGS = parser.parse_args()
   DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
