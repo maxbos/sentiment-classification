@@ -33,21 +33,21 @@ class Model(nn.Module):
 
   def __init__(
     self, ntokens, d_model, nhead, num_layers, device,
-    d_mpool, n_output=2,
+    d_mpool, pad_idx, n_output=1,
   ):
     super(Model, self).__init__()
 
     self.d_model = d_model
     self.d_mpool = d_mpool
 
-    self.embedding = nn.Embedding(ntokens, d_model)
+    self.embedding = nn.Embedding(ntokens, d_model, padding_idx=pad_idx)
     self.pos_encoder = PositionalEncoding(d_model)
     self.ste = StochasticNeuron()
     encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead)
     self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-    # self.maxpool = nn.AdaptiveMaxPool2d((d_mpool, d_mpool))
-    self.maxpool = nn.AdaptiveAvgPool2d((d_mpool, d_mpool))
-    self.fc1 = nn.Linear(d_mpool*d_mpool, 256)
+    self.maxpool = nn.AdaptiveMaxPool2d((d_mpool, d_model))
+    # self.maxpool = nn.AdaptiveAvgPool2d((d_mpool, d_model))
+    self.fc1 = nn.Linear(d_mpool*d_model, 256)
     self.fc2 = nn.Linear(256, n_output)
 
   def forward(self, input):
@@ -57,7 +57,8 @@ class Model(nn.Module):
     # out = self.ste(pos_encoded)
     out = self.transformer_encoder(pos_encoded)
     out = self.maxpool(out)
-    out = out.view(-1, self.d_mpool*self.d_mpool)
+    out = out.view(-1, self.d_mpool*self.d_model)
     out = self.fc1(out)
     out = self.fc2(out)
-    return F.logsigmoid(out)
+    # return F.logsigmoid(out)
+    return out

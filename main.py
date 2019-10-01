@@ -16,40 +16,59 @@ from model import Model
 def main():
   print('Starting process...')
   
+  SEED = 1234
+  torch.manual_seed(SEED)
+
   # set up fields
-  TEXT = torchtext.data.Field(lower=True, include_lengths=True, batch_first=True)
-  LABEL = torchtext.data.Field(sequential=False)
+  TEXT = torchtext.data.Field(tokenize='spacy', batch_first=True)
+  LABEL = torchtext.data.LabelField(dtype=torch.float)
 
   # make splits for data
-  train_split, test_split = datasets.IMDB.splits(TEXT, LABEL)
+  train_data, test_data = datasets.IMDB.splits(TEXT, LABEL)
 
   # build the vocabulary
-  # TEXT.build_vocab(train_split, vectors=GloVe(name='6B', dim=ARGS.d_model))
-  TEXT.build_vocab(train_split)
-  LABEL.build_vocab(train_split)
+  MAX_VOCAB_SIZE = 25_000
+  TEXT.build_vocab(
+    train_data, max_size=MAX_VOCAB_SIZE, vectors="glove.6B.100d",
+    unk_init=torch.Tensor.normal_,
+  )
+  LABEL.build_vocab(train_data)
 
   # make iterator for splits
   train_iter, test_iter = torchtext.data.BucketIterator.splits(
-      (train_split, test_split), batch_size=ARGS.batch_size, device=0)
+      (train_data, test_data), batch_size=ARGS.batch_size, device=0)
   
-  ntokens = len(TEXT.vocab.stoi)
+  ntokens = len(TEXT.vocab)
+  PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
   model = Model(
     ntokens=ntokens,
     d_model=ARGS.d_model, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
     d_mpool=ARGS.d_mpool,
+    pad_idx=PAD_IDX,
     device=DEVICE,
   )
 
-  criterion = torch.nn.CrossEntropyLoss()
+  pretrained_embeddings = TEXT.vocab.vectors
+  model.embedding.weight.data.copy_(pretrained_embeddings)
+  UNK_IDX = TEXT.vocab.stoi[TEXT.unk_token]
+  model.embedding.weight.data[UNK_IDX] = torch.zeros(ARGS.d_model)
+  model.embedding.weight.data[PAD_IDX] = torch.zeros(ARGS.d_model)
+
+  criterion = torch.nn.BCEWithLogitsLoss()
   optimizer = torch.optim.Adam(model.parameters())
 
   for epoch in range(1, ARGS.epochs + 1):
     train(epoch, ntokens, model, train_iter, criterion, optimizer)
 
 
+# def accuracy(output, labels):
+#   predicted = output.argmax(-1)
+#   return (predicted == (labels-1).long()).float().mean().item()
 def accuracy(output, labels):
-  predicted = output.argmax(-1)
-  return (predicted == (labels-1).long()).float().mean().item()
+  rounded_preds = torch.round(torch.sigmoid(output))
+  correct = (rounded_preds == labels).float() #convert into float for division 
+  acc = correct.sum() / len(correct)
+  return acc
 
 
 def train(epoch, ntokens, model, train_iter, criterion, optimizer):
@@ -58,14 +77,11 @@ def train(epoch, ntokens, model, train_iter, criterion, optimizer):
   start_time = time.time()
   total_loss = 0.
   for i, batch in enumerate(train_iter):
-    data = batch.text
-    targets = batch.label
     optimizer.zero_grad()
-    # data[0] returns the sequence matrix
-    output = model(data[0])
-    loss = criterion(output, (targets-1))
+    output = model(batch.text).squeeze(1)
+    loss = criterion(output, batch.label)
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
     optimizer.step()
     
     total_loss += loss.item()
@@ -73,10 +89,10 @@ def train(epoch, ntokens, model, train_iter, criterion, optimizer):
     if i % log_interval == 0 and i > 0:
       cur_loss = total_loss / log_interval
       elapsed = time.time() - start_time
-      train_accuracy = accuracy(output, targets)
+      train_accuracy = accuracy(output, batch.label)
       print('| epoch {:3d} | {:5d}/{:5d} batches | '
             'ms/batch {:5.2f} | '
-            'loss {:5.2f} | train acc {:5.2f}'.format(
+            'loss {:5.5f} | train acc {:5.2f}'.format(
               epoch, i, len(train_iter),
               elapsed * 1000 / log_interval,
               cur_loss, train_accuracy))
@@ -96,7 +112,7 @@ if __name__ == "__main__":
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=32, type=int,
                       help='batch size')
-  parser.add_argument('--d_model', default=128, type=int,
+  parser.add_argument('--d_model', default=100, type=int,
                       help='embedding size')
   parser.add_argument('--nhead', default=4, type=int,
                       help='heads in multi head attention')
