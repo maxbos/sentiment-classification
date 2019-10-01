@@ -11,11 +11,12 @@ class Model(nn.Module):
       pretrained_embeddings, freeze=False).to(device)
     encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead)
     self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+    self.fc = nn.Linear(100, 2)
 
   def forward(self, input):
     """"""
     embedded = self.embedding(input)
     out = self.ste(embedded)
     out = self.transformer_encoder(out)
-    print('out', out)
-    return
+    out = self.fc(out)
+    return F.sigmoid(out)
