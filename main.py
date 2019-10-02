@@ -2,11 +2,11 @@ import argparse
 import time
 import torch
 import os
-import math
+import random
+import tqdm
 import numpy as np
 import torchtext
 import torchtext.data as data
-# import torchtext.vocab.GloVe as GloVe
 import torchtext.datasets as datasets
 from torchtext.vocab import GloVe
 
@@ -19,6 +19,7 @@ def main():
   
   SEED = 1234
   torch.manual_seed(SEED)
+  torch.backends.cudnn.deterministic = True
 
   # set up fields
   TEXT = torchtext.data.Field(tokenize='spacy', batch_first=True)
@@ -26,6 +27,7 @@ def main():
 
   # make splits for data
   train_data, test_data = datasets.IMDB.splits(TEXT, LABEL)
+  train_data, valid_data = train_data.split(random_state=random.seed(SEED))
 
   # build the vocabulary
   MAX_VOCAB_SIZE = 25_000
@@ -36,18 +38,9 @@ def main():
   LABEL.build_vocab(train_data)
 
   # make iterator for splits
-  train_iter, test_iter = torchtext.data.BucketIterator.splits(
-      (train_data, test_data), batch_size=ARGS.batch_size, device=0)
+  train_iter, valid_iter, test_iter = torchtext.data.BucketIterator.splits(
+      (train_data, valid_data, test_data), batch_size=ARGS.batch_size, device=DEVICE)
   
-  # ntokens = len(TEXT.vocab)
-  # PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
-  # model = Model(
-  #   ntokens=ntokens,
-  #   d_model=ARGS.embed_dim, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
-  #   d_mpool=ARGS.d_mpool,
-  #   pad_idx=PAD_IDX,
-  #   device=DEVICE,
-  # )
   vocab_size = len(TEXT.vocab)
   N_FILTERS = 100
   FILTER_SIZES = [3,4,5]
@@ -66,59 +59,65 @@ def main():
   criterion = torch.nn.BCEWithLogitsLoss()
   optimizer = torch.optim.Adam(model.parameters())
 
+  model.to(DEVICE)
+  criterion.to(DEVICE)
+
+  best_valid_loss = float('inf')
   for epoch in range(1, ARGS.epochs + 1):
-    train(epoch, model, train_iter, criterion, optimizer)
+    start_time = time.time()
+
+    model.train()
+    train_loss, train_acc = run_epoch(model, train_iter, criterion, optimizer)
+
+    model.eval()
+    with torch.no_grad():
+      valid_loss, valid_acc = run_epoch(model, valid_iter, criterion)
+    
+    end_time = time.time()
+
+    epoch_mins, epoch_secs = epoch_time(start_time, end_time)
+
+    if valid_loss < best_valid_loss:
+      best_valid_loss = valid_loss
+      torch.save(model.state_dict(), 'model.pt')
+    
+    print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
+    print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
+    print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
+  
+  # Perform a final test evaluation
+  test_loss, test_acc = run_epoch(model, test_iter, criterion)
+  print(f'Test Loss: {test_loss:.3f} | Test Acc: {test_acc*100:.2f}%')
 
 
-# def accuracy(output, labels):
-#   predicted = output.argmax(-1)
-#   return (predicted == (labels-1).long()).float().mean().item()
-def accuracy(output, labels):
+def epoch_time(start_time, end_time):
+    elapsed_time = end_time - start_time
+    elapsed_mins = int(elapsed_time / 60)
+    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
+    return elapsed_mins, elapsed_secs
+
+
+def calc_accuracy(output, labels):
   rounded_preds = torch.round(torch.sigmoid(output))
-  correct = (rounded_preds == labels).float() #convert into float for division 
-  acc = correct.sum() / len(correct)
-  return acc
+  # correct = (rounded_preds == labels).float()
+  # acc = correct.sum() / len(correct)
+  return (rounded_preds == labels).float().mean()
 
 
-def train(epoch, model, train_iter, criterion, optimizer):
-  """"""
-  model.train()
-  start_time = time.time()
+def run_epoch(model, iter, criterion, optimizer=None):
   total_loss = 0.
   total_acc = 0.
-  for i, batch in enumerate(train_iter):
-    optimizer.zero_grad()
+  for batch in tqdm(iter):
+    if model.training:
+      optimizer.zero_grad()
     output = model(batch.text).squeeze(1)
-    print(output.size(), batch.label.size())
-    loss = criterion(output, batch.label)
-    train_accuracy = accuracy(output, batch.label)
-
-    loss.backward()
-    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-    optimizer.step()
-    
+    accuracy = calc_accuracy(output, batch.label)
+    if model.training:
+      loss.backward()
+      optimizer.step()
     total_loss += loss.item()
-    total_acc += train_accuracy
-    log_interval = 3
-    if i % log_interval == 0 and i > 0:
-      cur_loss = total_loss / log_interval
-      cur_acc = total_acc / log_interval
-      elapsed = time.time() - start_time
-      print('| epoch {:3d} | {:5d}/{:5d} batches | '
-            'ms/batch {:5.2f} | '
-            'loss {:5.5f} | train acc {:5.2f}'.format(
-              epoch, i, len(train_iter),
-              elapsed * 1000 / log_interval,
-              cur_loss, cur_acc))
-      total_loss = 0.
-      total_acc = 0.
-      start_time = time.time()
-
-
-# def evaluate(model, loss, test_iter):
-#   model.eval()
-#   with torch.no_grad():
-    
+    total_acc += accuracy
+  return total_loss/len(iter), total_acc/len(iter)
 
 
 if __name__ == "__main__":
@@ -129,13 +128,7 @@ if __name__ == "__main__":
                       help='batch size')
   parser.add_argument('--embed_dim', default=100, type=int,
                       help='embedding size')
-  parser.add_argument('--nhead', default=4, type=int,
-                      help='heads in multi head attention')
-  parser.add_argument('--num_layers', default=2, type=int,
-                      help='amount of layers transformer')
-  parser.add_argument('--d_mpool', default=64, type=int,
-                      help='number of vectors in sequence pooling')
 
   ARGS = parser.parse_args()
-  DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+  DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   main()
