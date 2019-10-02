@@ -109,6 +109,7 @@ def run_epoch(model, iter, criterion, optimizer=None):
     if model.training:
       optimizer.zero_grad()
     output = model(batch.text).squeeze(1)
+    loss = criterion(output, batch.label)
     accuracy = calc_accuracy(output, batch.label)
     if model.training:
       loss.backward()
