@@ -7,10 +7,10 @@ class CNN(nn.Module):
     def __init__(self, vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, 
                  dropout, pad_idx):
         super(CNN, self).__init__()
-        
+
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx = pad_idx)
         self.ste = StochasticNeuron()
-        
+
         self.conv_0 = nn.Conv2d(in_channels = 1, 
                                 out_channels = n_filters, 
                                 kernel_size = (filter_sizes[0], embedding_dim))
@@ -24,14 +24,13 @@ class CNN(nn.Module):
                                 kernel_size = (filter_sizes[2], embedding_dim))
         
         self.fc = nn.Linear(len(filter_sizes) * n_filters, output_dim)
-        
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, text):
         
         #text = [sent len, batch size]
         
-        text = text.permute(1, 0)
+        # text = text.permute(1, 0)
                 
         #text = [batch size, sent len]
         
@@ -46,7 +45,8 @@ class CNN(nn.Module):
         conved_0 = F.relu(self.conv_0(embedded).squeeze(3))
         conved_1 = F.relu(self.conv_1(embedded).squeeze(3))
         conved_2 = F.relu(self.conv_2(embedded).squeeze(3))
-            
+
+
         #conved_n = [batch size, n_filters, sent len - filter_sizes[n] + 1]
         
         pooled_0 = F.max_pool1d(conved_0, conved_0.shape[2]).squeeze(2)

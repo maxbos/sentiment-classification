@@ -27,6 +27,9 @@ bernoulli = Bernoulli.apply
 estimate = Estimate.apply
 
 class StochasticNeuron(nn.Module):
+    
+    def __init__(self):
+        super(StochasticNeuron, self).__init__()
 
     def __init__(self, variant='StraightThrough'):
         super(StochasticNeuron, self).__init__()
