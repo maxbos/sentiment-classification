@@ -3,7 +3,7 @@ import time
 import torch
 import os
 import random
-import tqdm
+from tqdm import tqdm
 import numpy as np
 import torchtext
 import torchtext.data as data

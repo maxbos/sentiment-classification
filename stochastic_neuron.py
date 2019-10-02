@@ -16,6 +16,9 @@ class Bernoulli(Function):
 bernoulli = Bernoulli.apply
 
 class StochasticNeuron(nn.Module):
+    
+    def __init__(self):
+        super(StochasticNeuron, self).__init__()
 
     def forward(self, x):
         p = torch.sigmoid(x)
