@@ -11,7 +11,7 @@ class PositionalEncoding(nn.Module):
   Positional encoding.
   """
 
-  def __init__(self, d_model, dropout=0.0, max_len=5000):
+  def __init__(self, d_model, dropout=0.1, max_len=1000):
     super(PositionalEncoding, self).__init__()
     self.dropout = nn.Dropout(p=dropout)
 
@@ -56,9 +56,9 @@ class Model(nn.Module):
     pos_encoded = self.pos_encoder(embedded)
     # out = self.ste(pos_encoded)
     out = self.transformer_encoder(pos_encoded)
-    out = self.maxpool(out)
+    out = F.relu(self.maxpool(out))
     out = out.view(-1, self.d_mpool*self.d_model)
-    out = self.fc1(out)
+    out = F.relu(self.fc1(out))
     out = self.fc2(out)
     # return F.logsigmoid(out)
     return out

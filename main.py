@@ -11,6 +11,7 @@ import torchtext.datasets as datasets
 from torchtext.vocab import GloVe
 
 from model import Model
+from cnn import CNN
 
 
 def main():
@@ -20,7 +21,7 @@ def main():
   torch.manual_seed(SEED)
 
   # set up fields
-  TEXT = torchtext.data.Field(tokenize='spacy', batch_first=True)
+  TEXT = torchtext.data.Field(tokenize='spacy')
   LABEL = torchtext.data.LabelField(dtype=torch.float)
 
   # make splits for data
@@ -38,15 +39,24 @@ def main():
   train_iter, test_iter = torchtext.data.BucketIterator.splits(
       (train_data, test_data), batch_size=ARGS.batch_size, device=0)
   
-  ntokens = len(TEXT.vocab)
+  # ntokens = len(TEXT.vocab)
+  # PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
+  # model = Model(
+  #   ntokens=ntokens,
+  #   d_model=ARGS.d_model, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
+  #   d_mpool=ARGS.d_mpool,
+  #   pad_idx=PAD_IDX,
+  #   device=DEVICE,
+  # )
+  INPUT_DIM = len(TEXT.vocab)
+  EMBEDDING_DIM = 100
+  N_FILTERS = 100
+  FILTER_SIZES = [3,4,5]
+  OUTPUT_DIM = 1
+  DROPOUT = 0.5
   PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
-  model = Model(
-    ntokens=ntokens,
-    d_model=ARGS.d_model, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
-    d_mpool=ARGS.d_mpool,
-    pad_idx=PAD_IDX,
-    device=DEVICE,
-  )
+
+  model = CNN(INPUT_DIM, EMBEDDING_DIM, N_FILTERS, FILTER_SIZES, OUTPUT_DIM, DROPOUT, PAD_IDX)
 
   pretrained_embeddings = TEXT.vocab.vectors
   model.embedding.weight.data.copy_(pretrained_embeddings)
@@ -58,7 +68,7 @@ def main():
   optimizer = torch.optim.Adam(model.parameters())
 
   for epoch in range(1, ARGS.epochs + 1):
-    train(epoch, ntokens, model, train_iter, criterion, optimizer)
+    train(epoch, model, train_iter, criterion, optimizer)
 
 
 # def accuracy(output, labels):
@@ -71,32 +81,38 @@ def accuracy(output, labels):
   return acc
 
 
-def train(epoch, ntokens, model, train_iter, criterion, optimizer):
+def train(epoch, model, train_iter, criterion, optimizer):
   """"""
   model.train()
   start_time = time.time()
   total_loss = 0.
+  total_acc = 0.
   for i, batch in enumerate(train_iter):
     optimizer.zero_grad()
     output = model(batch.text).squeeze(1)
+    print(output.size(), batch.label.size())
     loss = criterion(output, batch.label)
+    train_accuracy = accuracy(output, batch.label)
+
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
     optimizer.step()
     
     total_loss += loss.item()
+    total_acc += train_accuracy
     log_interval = 3
     if i % log_interval == 0 and i > 0:
       cur_loss = total_loss / log_interval
+      cur_acc = total_acc / log_interval
       elapsed = time.time() - start_time
-      train_accuracy = accuracy(output, batch.label)
       print('| epoch {:3d} | {:5d}/{:5d} batches | '
             'ms/batch {:5.2f} | '
             'loss {:5.5f} | train acc {:5.2f}'.format(
               epoch, i, len(train_iter),
               elapsed * 1000 / log_interval,
-              cur_loss, train_accuracy))
+              cur_loss, cur_acc))
       total_loss = 0.
+      total_acc = 0.
       start_time = time.time()
 
 
@@ -110,7 +126,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--epochs', default=4, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=32, type=int,
+  parser.add_argument('--batch_size', default=64, type=int,
                       help='batch size')
   parser.add_argument('--d_model', default=100, type=int,
                       help='embedding size')
