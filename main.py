@@ -21,7 +21,7 @@ def main():
   torch.manual_seed(SEED)
 
   # set up fields
-  TEXT = torchtext.data.Field(tokenize='spacy')
+  TEXT = torchtext.data.Field(tokenize='spacy', batch_first=True)
   LABEL = torchtext.data.LabelField(dtype=torch.float)
 
   # make splits for data
@@ -43,26 +43,25 @@ def main():
   # PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
   # model = Model(
   #   ntokens=ntokens,
-  #   d_model=ARGS.d_model, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
+  #   d_model=ARGS.embed_dim, nhead=ARGS.nhead, num_layers=ARGS.num_layers,
   #   d_mpool=ARGS.d_mpool,
   #   pad_idx=PAD_IDX,
   #   device=DEVICE,
   # )
-  INPUT_DIM = len(TEXT.vocab)
-  EMBEDDING_DIM = 100
+  vocab_size = len(TEXT.vocab)
   N_FILTERS = 100
   FILTER_SIZES = [3,4,5]
   OUTPUT_DIM = 1
   DROPOUT = 0.5
   PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
 
-  model = CNN(INPUT_DIM, EMBEDDING_DIM, N_FILTERS, FILTER_SIZES, OUTPUT_DIM, DROPOUT, PAD_IDX)
+  model = CNN(vocab_size, ARGS.embed_dim, N_FILTERS, FILTER_SIZES, OUTPUT_DIM, DROPOUT, PAD_IDX)
 
   pretrained_embeddings = TEXT.vocab.vectors
   model.embedding.weight.data.copy_(pretrained_embeddings)
   UNK_IDX = TEXT.vocab.stoi[TEXT.unk_token]
-  model.embedding.weight.data[UNK_IDX] = torch.zeros(ARGS.d_model)
-  model.embedding.weight.data[PAD_IDX] = torch.zeros(ARGS.d_model)
+  model.embedding.weight.data[UNK_IDX] = torch.zeros(ARGS.embed_dim)
+  model.embedding.weight.data[PAD_IDX] = torch.zeros(ARGS.embed_dim)
 
   criterion = torch.nn.BCEWithLogitsLoss()
   optimizer = torch.optim.Adam(model.parameters())
@@ -128,7 +127,7 @@ if __name__ == "__main__":
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=64, type=int,
                       help='batch size')
-  parser.add_argument('--d_model', default=100, type=int,
+  parser.add_argument('--embed_dim', default=100, type=int,
                       help='embedding size')
   parser.add_argument('--nhead', default=4, type=int,
                       help='heads in multi head attention')
