@@ -57,6 +57,7 @@ def main():
   PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
 
   model = CNN(INPUT_DIM, EMBEDDING_DIM, N_FILTERS, FILTER_SIZES, OUTPUT_DIM, DROPOUT, PAD_IDX)
+  model.to(DEVICE)
 
   pretrained_embeddings = TEXT.vocab.vectors
   model.embedding.weight.data.copy_(pretrained_embeddings)
@@ -76,7 +77,7 @@ def main():
 #   return (predicted == (labels-1).long()).float().mean().item()
 def accuracy(output, labels):
   rounded_preds = torch.round(torch.sigmoid(output))
-  correct = (rounded_preds == labels).float() #convert into float for division 
+  correct = (rounded_preds == labels.to(DEVICE)).float() #convert into float for division 
   acc = correct.sum() / len(correct)
   return acc
 
@@ -89,9 +90,9 @@ def train(epoch, model, train_iter, criterion, optimizer):
   total_acc = 0.
   for i, batch in enumerate(train_iter):
     optimizer.zero_grad()
-    output = model(batch.text).squeeze(1)
+    output = model(batch.text.to(DEVICE)).squeeze(1)
     print(output.size(), batch.label.size())
-    loss = criterion(output, batch.label)
+    loss = criterion(output, batch.label.to(DEVICE))
     train_accuracy = accuracy(output, batch.label)
 
     loss.backward()

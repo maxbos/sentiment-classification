@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from stochastic_neuron import StochasticNeuron
 
 class CNN(nn.Module):
     def __init__(self, vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, 
                  dropout, pad_idx):
-        
-        super().__init__()
+        super(CNN, self).__init__()
         
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx = pad_idx)
+        self.ste = StochasticNeuron()
         
         self.conv_0 = nn.Conv2d(in_channels = 1, 
                                 out_channels = n_filters, 
@@ -35,7 +35,7 @@ class CNN(nn.Module):
                 
         #text = [batch size, sent len]
         
-        embedded = self.embedding(text)
+        embedded = self.ste(self.embedding(text))
                 
         #embedded = [batch size, sent len, emb dim]
         
