@@ -9,8 +9,8 @@ import torchtext
 import torchtext.data as data
 import torchtext.datasets as datasets
 from torchtext.vocab import GloVe
-
-from model import Model
+import matplotlib.pyplot as plt
+import seaborn as sns
 from cnn import CNN
 
 
@@ -43,7 +43,7 @@ def main():
   
   vocab_size = len(TEXT.vocab)
   N_FILTERS = 100
-  FILTER_SIZES = [2,3,4,5,8,10]
+  FILTER_SIZES = [3,4,5,16]
   OUTPUT_DIM = 1
   DROPOUT = 0.5
   PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
@@ -67,11 +67,11 @@ def main():
     start_time = time.time()
 
     model.train()
-    train_loss, train_acc = run_epoch(model, train_iter, criterion, optimizer)
+    train_loss, train_acc, train_p, train_tn, train_fp, train_fn = run_epoch(model, train_iter, criterion, optimizer)
 
     model.eval()
     with torch.no_grad():
-      valid_loss, valid_acc = run_epoch(model, valid_iter, criterion)
+      valid_loss, valid_acc, val_p, val_tn, val_fp, val_fn = run_epoch(model, valid_iter, criterion)
     
     end_time = time.time()
 
@@ -86,9 +86,13 @@ def main():
     print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
   
   # Perform a final test evaluation
-  test_loss, test_acc = run_epoch(model, test_iter, criterion)
+  test_loss, test_acc, test_tp, test_tn, test_fp, test_fn  = run_epoch(model, test_iter, criterion)
   print(f'Test Loss: {test_loss:.3f} | Test Acc: {test_acc*100:.2f}%')
-
+  sns.heatmap(
+    np.array([[test_tp, test_fp], [test_fn, test_tn]]),
+    vmax=.5,linewidth=0.5, cmap="Blues", xticklabels=["Positive", "Negative"], yticklabels=["True", "False"])
+  print(np.array([[test_tp, test_fp], [test_fn, test_tn]]))
+  plt.show()
 
 def epoch_time(start_time, end_time):
     elapsed_time = end_time - start_time
@@ -101,22 +105,43 @@ def calc_accuracy(output, labels):
   rounded_preds = torch.round(torch.sigmoid(output))
   return (rounded_preds == labels).float().mean()
 
+def calc_error_dist(output, labels):
+  rounded_preds = torch.round(torch.sigmoid(output))
+  tp = (rounded_preds == labels)[torch.where(labels == 1)].float().sum().item() / len(labels)
+  tn = (rounded_preds == labels)[torch.where(labels == 0)].float().sum().item() / len(labels)
+  fp = (rounded_preds != labels)[torch.where(labels == 1)].float().sum().item() / len(labels)
+  fn = (rounded_preds != labels)[torch.where(labels == 0)].float().sum().item() / len(labels)
+  return tp, tn, fp, fn
+
 
 def run_epoch(model, iter, criterion, optimizer=None):
   total_loss = 0.
   total_acc = 0.
+  total_tp = 0.
+  total_tn = 0.
+  total_fp = 0.
+  total_fn = 0.
   for batch in tqdm(iter):
     if model.training:
       optimizer.zero_grad()
     output = model(batch.text).squeeze(1)
     loss = criterion(output, batch.label)
     accuracy = calc_accuracy(output, batch.label)
+    tp, tn, fp, fn = calc_error_dist(output, batch.label)
+    total_tp += tp
+    total_tn += tn
+    total_fp += fp
+    total_fn += fn
+
     if model.training:
       loss.backward()
+      torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
       optimizer.step()
     total_loss += loss.item()
     total_acc += accuracy
-  return total_loss/len(iter), total_acc/len(iter)
+  return (
+    total_loss/len(iter), total_acc/len(iter), total_tp/len(iter),
+    total_tn/len(iter), total_fp/len(iter), total_fn/len(iter))
 
 
 if __name__ == "__main__":
