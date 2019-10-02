@@ -43,7 +43,7 @@ def main():
   
   vocab_size = len(TEXT.vocab)
   N_FILTERS = 100
-  FILTER_SIZES = [3,4,5]
+  FILTER_SIZES = [2,3,4,5,8,10]
   OUTPUT_DIM = 1
   DROPOUT = 0.5
   PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
