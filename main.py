@@ -81,7 +81,7 @@ def main():
       best_valid_loss = valid_loss
       torch.save(model.state_dict(), 'model.pt')
     
-    print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
+    print(f'Epoch: {epoch:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
     print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
     print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
   
@@ -99,8 +99,6 @@ def epoch_time(start_time, end_time):
 
 def calc_accuracy(output, labels):
   rounded_preds = torch.round(torch.sigmoid(output))
-  # correct = (rounded_preds == labels).float()
-  # acc = correct.sum() / len(correct)
   return (rounded_preds == labels).float().mean()
 
 
