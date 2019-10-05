@@ -35,7 +35,7 @@ class CNN(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, text):
-        if self.ste_type in ['REINFORCE', 'STE']:
+        if self.ste_type in ['REINFORCE', 'ST']:
             embeddings = self.ste(self.embedding(text))
         else:
             embeddings = self.embedding(text)

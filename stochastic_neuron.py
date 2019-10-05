@@ -31,7 +31,7 @@ class StochasticNeuron(nn.Module):
     def __init__(self):
         super(StochasticNeuron, self).__init__()
 
-    def __init__(self, variant='StraightThrough'):
+    def __init__(self, variant='ST'):
         super(StochasticNeuron, self).__init__()
         self.variant = variant
         # self.l = nn.Linear(1, 1)
@@ -39,7 +39,7 @@ class StochasticNeuron(nn.Module):
     def forward(self, x):
         p = torch.sigmoid(x)
 
-        if self.variant == 'StraightThrough':
+        if self.variant == 'ST':
             turned_off = bernoulli(p)
         # use REINFORCE
         else:

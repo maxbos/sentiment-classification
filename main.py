@@ -17,19 +17,16 @@ from cnn import CNN
 def main():
   print('Starting process...')
   
-  SEED = 1234
+  SEED = 111
   torch.manual_seed(SEED)
   torch.backends.cudnn.deterministic = True
 
-  # set up fields
   TEXT = torchtext.data.Field(tokenize='spacy', batch_first=True)
   LABEL = torchtext.data.LabelField(dtype=torch.float)
 
-  # make splits for data
   train_data, test_data = datasets.IMDB.splits(TEXT, LABEL)
   train_data, valid_data = train_data.split(random_state=random.seed(SEED))
 
-  # build the vocabulary
   MAX_VOCAB_SIZE = 25_000
   TEXT.build_vocab(
     train_data, max_size=MAX_VOCAB_SIZE, vectors="glove.6B.100d",
@@ -37,18 +34,14 @@ def main():
   )
   LABEL.build_vocab(train_data)
 
-  # make iterator for splits
   train_iter, valid_iter, test_iter = torchtext.data.BucketIterator.splits(
       (train_data, valid_data, test_data), batch_size=ARGS.batch_size, device=DEVICE)
   
   vocab_size = len(TEXT.vocab)
-  N_FILTERS = 100
-  FILTER_SIZES = [3,4,5,16]
-  OUTPUT_DIM = 1
-  DROPOUT = 0.5
-  PAD_IDX = TEXT.vocab.stoi[TEXT.pad_token]
-
-  model = CNN(vocab_size, ARGS.embed_dim, N_FILTERS, FILTER_SIZES, OUTPUT_DIM, DROPOUT, PAD_IDX)
+  pad_idx = TEXT.vocab.stoi[TEXT.pad_token]
+  filter_sizes = np.array(ARGS.filter_sizes.split(','), dtype=int)
+  model = CNN(vocab_size, ARGS.embed_dim, ARGS.n_filters, filter_sizes,
+    ARGS.output_dim, ARGS.dropout_rate, pad_idx)
 
   pretrained_embeddings = TEXT.vocab.vectors
   model.embedding.weight.data.copy_(pretrained_embeddings)
@@ -62,7 +55,7 @@ def main():
   model.to(DEVICE)
   criterion.to(DEVICE)
 
-  best_valid_loss = float('inf')
+  min_valid_loss = float('inf')
   for epoch in range(1, ARGS.epochs + 1):
     start_time = time.time()
 
@@ -77,15 +70,16 @@ def main():
 
     epoch_mins, epoch_secs = epoch_time(start_time, end_time)
 
-    if valid_loss < best_valid_loss:
-      best_valid_loss = valid_loss
+    if valid_loss < min_valid_loss:
+      min_valid_loss = valid_loss
       torch.save(model.state_dict(), 'model.pt')
     
-    print(f'Epoch: {epoch:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
-    print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
-    print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
+    print(
+      f'Epoch: {epoch:02} | Epoch Time: {epoch_mins}m {epoch_secs}s\n' \
+      f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%\n' \
+      f'\tVal. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%'
+    )
   
-  # Perform a final test evaluation
   test_loss, test_acc, test_tp, test_tn, test_fp, test_fn  = run_epoch(model, test_iter, criterion)
   print(f'Test Loss: {test_loss:.3f} | Test Acc: {test_acc*100:.2f}%')
   sns.heatmap(
@@ -94,23 +88,23 @@ def main():
   print(np.array([[test_tp, test_fp], [test_fn, test_tn]]))
   plt.show()
 
+
 def epoch_time(start_time, end_time):
     elapsed_time = end_time - start_time
-    elapsed_mins = int(elapsed_time / 60)
-    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
-    return elapsed_mins, elapsed_secs
+    return int(elapsed_time / 60), int(elapsed_time - (elapsed_mins * 60))
 
 
 def calc_accuracy(output, labels):
-  rounded_preds = torch.round(torch.sigmoid(output))
-  return (rounded_preds == labels).float().mean()
+  predictions = torch.round(torch.sigmoid(output))
+  return (predictions == labels).float().mean()
+
 
 def calc_error_dist(output, labels):
-  rounded_preds = torch.round(torch.sigmoid(output))
-  tp = (rounded_preds == labels)[torch.where(labels == 1)].float().sum().item() / len(labels)
-  tn = (rounded_preds == labels)[torch.where(labels == 0)].float().sum().item() / len(labels)
-  fp = (rounded_preds != labels)[torch.where(labels == 1)].float().sum().item() / len(labels)
-  fn = (rounded_preds != labels)[torch.where(labels == 0)].float().sum().item() / len(labels)
+  predictions = torch.round(torch.sigmoid(output))
+  tp = (predictions == labels)[torch.where(labels == 1)].float().sum().item() / len(labels)
+  tn = (predictions == labels)[torch.where(labels == 0)].float().sum().item() / len(labels)
+  fp = (predictions != labels)[torch.where(labels == 1)].float().sum().item() / len(labels)
+  fn = (predictions != labels)[torch.where(labels == 0)].float().sum().item() / len(labels)
   return tp, tn, fp, fn
 
 
@@ -152,6 +146,16 @@ if __name__ == "__main__":
                       help='batch size')
   parser.add_argument('--embed_dim', default=100, type=int,
                       help='embedding size')
+  parser.add_argument('--n_filters', default=100, type=int,
+                      help='number of filters')
+  parser.add_argument('--filter_sizes', default="3,4,5", type=str,
+                      help='filter sizes')
+  parser.add_argument('--output_dim', default=1, type=int,
+                      help='number of outputs')
+  parser.add_argument('--dropout_rate', default=0.5, type=float,
+                      help='dropout rate')
+  parser.add_argument('--stochastic_neuron', default="REINFORCE", type=str,
+                      help='Type of stochastic neuron to use, has to be REINFORCE or ST')
 
   ARGS = parser.parse_args()
   DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
