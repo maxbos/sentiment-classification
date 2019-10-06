@@ -1,5 +1,12 @@
 # sentiment-classification
 
+### Results of different algorithms
+| Algorithm   |      Accuracy      |
+|----------|:-------------:|
+| CNN |  84.59% |
+| CNN-SBN-ST |   86.44%   |
+| CNN-DBN-ST | 87.54% |
+
 ### Prerequisite
     - Anaconda (python 3.x)
 
