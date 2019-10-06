@@ -1,6 +1,6 @@
 # sentiment-classification
 
-### Results of different algorithms
+### Results
 | Algorithm   |      Accuracy      |
 |----------|:-------------:|
 | CNN |  84.59% |
