@@ -27,9 +27,9 @@ def main():
   train_data, test_data = datasets.IMDB.splits(TEXT, LABEL)
   train_data, valid_data = train_data.split(random_state=random.seed(SEED))
 
-  MAX_VOCAB_SIZE = 25_000
+  max_vocab_size = 25_000
   TEXT.build_vocab(
-    train_data, max_size=MAX_VOCAB_SIZE, vectors="glove.6B.100d",
+    train_data, max_size=max_vocab_size, vectors="glove.6B.100d",
     unk_init=torch.Tensor.normal_,
   )
   LABEL.build_vocab(train_data)
@@ -40,7 +40,7 @@ def main():
   vocab_size = len(TEXT.vocab)
   pad_idx = TEXT.vocab.stoi[TEXT.pad_token]
   filter_sizes = np.array(ARGS.filter_sizes.split(','), dtype=int)
-  model = CNN(vocab_size, ARGS.stochastic_neuron, ARGS.embed_dim, ARGS.n_filters, filter_sizes,
+  model = CNN(vocab_size, ARGS.binary_neuron, ARGS.embed_dim, ARGS.n_filters, filter_sizes,
     ARGS.output_dim, ARGS.dropout_rate, pad_idx)
 
   pretrained_embeddings = TEXT.vocab.vectors
@@ -156,8 +156,8 @@ if __name__ == "__main__":
                       help='number of outputs')
   parser.add_argument('--dropout_rate', default=0.5, type=float,
                       help='dropout rate')
-  parser.add_argument('--stochastic_neuron', default="REINFORCE", type=str,
-                      help='Type of stochastic neuron to use, has to be REINFORCE or ST')
+  parser.add_argument('--binary_neuron', default="D-ST", type=str,
+                      help='Type of binary neuron to use, has to be D-ST or S-ST')
 
   ARGS = parser.parse_args()
   DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

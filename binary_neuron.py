@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from torch.autograd import Function
 
+
 class Bernoulli(Function):
     
     @staticmethod
@@ -12,6 +13,7 @@ class Bernoulli(Function):
     @staticmethod
     def backward(ctx, gradient):
         return gradient
+
 
 class Estimate(Function):
 
@@ -23,33 +25,25 @@ class Estimate(Function):
     def backward(ctx, gradient):
         return gradient
 
+
 bernoulli = Bernoulli.apply
 estimate = Estimate.apply
 
-class StochasticNeuron(nn.Module):
-    
-    def __init__(self):
-        super(StochasticNeuron, self).__init__()
 
-    def __init__(self, variant='ST'):
-        super(StochasticNeuron, self).__init__()
+class BinaryNeuron(nn.Module):
+
+    def __init__(self, variant):
+        super(BinaryNeuron, self).__init__()
+        assert variant in ['D-ST', 'S-ST'], 'variant should be D-ST or S-ST'
         self.variant = variant
-        # self.l = nn.Linear(1, 1)
 
     def forward(self, x):
         p = torch.sigmoid(x)
 
-        if self.variant == 'ST':
+        if self.variant == 'S-ST':
             turned_off = bernoulli(p)
-        # use REINFORCE
+        # use D-ST
         else:
             turned_off = estimate(p)
 
         return torch.mul(x, turned_off)
-
-
-"""
-x = torch.randn((32, 100))
-neuron = StochasticNeuron()
-print(neuron(x))
-"""

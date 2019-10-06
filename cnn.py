@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from stochastic_neuron import StochasticNeuron
+from binary_neuron import BinaryNeuron
+
 
 class CNN(nn.Module):
     def __init__(
@@ -18,7 +19,7 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=pad_idx)
-        self.ste = StochasticNeuron('REINFORCE') if ste == 'REINFORCE' else StochasticNeuron()
+        self.ste = BinaryNeuron(ste)
         self.ste_type = ste
 
         kernels = []
@@ -33,9 +34,9 @@ class CNN(nn.Module):
         self.kernels = nn.ModuleList(kernels)
         self.attention = nn.Linear(len(kernel_sizes) * filter_amount, classes_amount)
         self.dropout = nn.Dropout(dropout)
-        
+
     def forward(self, text):
-        if self.ste_type in ['REINFORCE', 'ST']:
+        if self.ste_type in ['D-ST', 'S-ST']:
             embeddings = self.ste(self.embedding(text))
         else:
             embeddings = self.embedding(text)
