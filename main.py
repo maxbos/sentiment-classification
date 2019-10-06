@@ -40,14 +40,14 @@ def main():
   vocab_size = len(TEXT.vocab)
   pad_idx = TEXT.vocab.stoi[TEXT.pad_token]
   filter_sizes = np.array(ARGS.filter_sizes.split(','), dtype=int)
-  model = CNN(vocab_size, ARGS.embed_dim, ARGS.n_filters, filter_sizes,
+  model = CNN(vocab_size, ARGS.stochastic_neuron, ARGS.embed_dim, ARGS.n_filters, filter_sizes,
     ARGS.output_dim, ARGS.dropout_rate, pad_idx)
 
   pretrained_embeddings = TEXT.vocab.vectors
   model.embedding.weight.data.copy_(pretrained_embeddings)
   UNK_IDX = TEXT.vocab.stoi[TEXT.unk_token]
   model.embedding.weight.data[UNK_IDX] = torch.zeros(ARGS.embed_dim)
-  model.embedding.weight.data[PAD_IDX] = torch.zeros(ARGS.embed_dim)
+  model.embedding.weight.data[pad_idx] = torch.zeros(ARGS.embed_dim)
 
   criterion = torch.nn.BCEWithLogitsLoss()
   optimizer = torch.optim.Adam(model.parameters())
@@ -91,7 +91,9 @@ def main():
 
 def epoch_time(start_time, end_time):
     elapsed_time = end_time - start_time
-    return int(elapsed_time / 60), int(elapsed_time - (elapsed_mins * 60))
+    elapsed_mins = int(elapsed_time / 60)
+    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
+    return elapsed_mins, elapsed_secs
 
 
 def calc_accuracy(output, labels):
@@ -148,7 +150,7 @@ if __name__ == "__main__":
                       help='embedding size')
   parser.add_argument('--n_filters', default=100, type=int,
                       help='number of filters')
-  parser.add_argument('--filter_sizes', default="3,4,5", type=str,
+  parser.add_argument('--filter_sizes', default="2,3,4,5", type=str,
                       help='filter sizes')
   parser.add_argument('--output_dim', default=1, type=int,
                       help='number of outputs')
